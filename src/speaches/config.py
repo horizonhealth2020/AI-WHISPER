@@ -1,3 +1,6 @@
+from collections.abc import Mapping
+import logging
+import os
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, SecretStr
@@ -9,6 +12,54 @@ type Device = Literal["cpu", "cuda", "auto"]
 type Quantization = Literal[
     "int8", "int8_float16", "int8_bfloat16", "int8_float32", "int16", "float16", "bfloat16", "float32", "default"
 ]
+
+logger = logging.getLogger(__name__)
+
+IDLE_OFFLOAD_DEFAULT_SECONDS = 300
+IDLE_OFFLOAD_ENV_VARS = (
+    "WHISPER_IDLE_OFFLOAD_SECONDS",
+    "MODEL_IDLE_TIMEOUT",
+    "MODEL_IDLE_SECONDS",
+    "IDLE_OFFLOAD_SECONDS",
+    "OFFLOAD_IDLE_SECONDS",
+)
+
+
+def resolve_idle_offload_seconds(
+    cli_value: int | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> int:
+    """Resolve STT idle offload timeout from CLI/env/default values."""
+
+    selected_value: str | int | None = cli_value
+    selected_source = "CLI flag --idle-offload-seconds"
+
+    if selected_value is None:
+        env = environ if environ is not None else os.environ
+        for env_name in IDLE_OFFLOAD_ENV_VARS:
+            env_value = env.get(env_name)
+            if env_value is None:
+                continue
+            selected_value = env_value
+            selected_source = f"environment variable {env_name}"
+            break
+
+    if selected_value is None:
+        return IDLE_OFFLOAD_DEFAULT_SECONDS
+
+    try:
+        parsed = int(selected_value)
+        if parsed < 0:
+            raise ValueError("must be >= 0")
+        return parsed
+    except (TypeError, ValueError):
+        logger.warning(
+            "Invalid idle offload seconds from %s: %r. Falling back to default %ss.",
+            selected_source,
+            selected_value,
+            IDLE_OFFLOAD_DEFAULT_SECONDS,
+        )
+        return IDLE_OFFLOAD_DEFAULT_SECONDS
 
 
 class WhisperConfig(BaseModel):
@@ -143,3 +194,10 @@ class Config(BaseSettings):
     Application will exit if any model fails to download or is not found in the registry.
     Example: ["Systran/faster-whisper-tiny", "rhasspy/piper-voices"]
     """
+
+    idle_offload_cli_seconds: int | None = None
+    """Optional CLI override for STT model idle offload timeout."""
+
+    @property
+    def stt_idle_offload_seconds(self) -> int:
+        return resolve_idle_offload_seconds(cli_value=self.idle_offload_cli_seconds)
