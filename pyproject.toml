@@ -44,6 +44,9 @@ dependencies = [
     "onnx-diarization>=0.1.0",
 ]
 
+[project.scripts]
+speaches = "speaches.__main__:main"
+
 [dependency-groups]
 dev = [
   {include-group = "docs"},

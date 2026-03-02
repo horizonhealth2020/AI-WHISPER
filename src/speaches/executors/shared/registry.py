@@ -26,13 +26,17 @@ class ExecutorRegistry:
     def __init__(self, config: Config) -> None:
         self._whisper_executor = Executor(
             name="whisper",
-            model_manager=WhisperModelManager(config.stt_model_ttl, config.whisper),
+            model_manager=WhisperModelManager(
+                config.stt_idle_offload_seconds if config.stt_idle_offload_seconds > 0 else -1, config.whisper
+            ),
             model_registry=whisper_model_registry,
             task="automatic-speech-recognition",
         )
         self._parakeet_executor = Executor(
             name="parakeet",
-            model_manager=ParakeetModelManager(config.stt_model_ttl, config.unstable_ort_opts),
+            model_manager=ParakeetModelManager(
+                config.stt_idle_offload_seconds if config.stt_idle_offload_seconds > 0 else -1, config.unstable_ort_opts
+            ),
             model_registry=parakeet_model_registry,
             task="automatic-speech-recognition",
         )
