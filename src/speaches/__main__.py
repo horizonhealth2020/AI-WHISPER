@@ -11,7 +11,7 @@ def main() -> None:
         "--idle-offload-seconds",
         type=int,
         default=None,
-        help="STT idle offload timeout in seconds. 0 disables offloading.",
+        help="STT idle offload timeout in seconds. Use -1 to disable offloading.",
     )
     args = parser.parse_args()
 
