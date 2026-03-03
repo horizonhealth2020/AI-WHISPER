@@ -15,7 +15,7 @@ type Quantization = Literal[
 
 logger = logging.getLogger(__name__)
 
-IDLE_OFFLOAD_DEFAULT_SECONDS = 300
+IDLE_OFFLOAD_DEFAULT_SECONDS = 1000
 IDLE_OFFLOAD_ENV_VARS = (
     "WHISPER_IDLE_OFFLOAD_SECONDS",
     "MODEL_IDLE_TIMEOUT",
@@ -99,14 +99,14 @@ class Config(BaseSettings):
 
     model_config = SettingsConfigDict(env_nested_delimiter="__")
 
-    stt_model_ttl: int = Field(default=300, ge=-1)
+    stt_model_ttl: int = Field(default=1000, ge=-1)
     """
     Time in seconds until a speech to text (stt) model is unloaded after last usage.
     -1: Never unload the model.
     0: Unload the model immediately after usage.
     """
 
-    tts_model_ttl: int = Field(default=300, ge=-1)
+    tts_model_ttl: int = Field(default=1000, ge=-1)
     """
     Time in seconds until a text to speech (tts) model is unloaded after last usage.
     -1: Never unload the model.
