@@ -51,6 +51,8 @@ def resolve_idle_offload_seconds(
         parsed = int(selected_value)
         if parsed < 0:
             raise ValueError("must be >= 0")
+        if parsed == 0:
+            return -1
         return parsed
     except (TypeError, ValueError):
         logger.warning(

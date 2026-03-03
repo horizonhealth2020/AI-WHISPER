@@ -100,6 +100,13 @@ def create_app() -> FastAPI:
     logger = logging.getLogger(__name__)
 
     logger.debug(f"Config: {config}")
+    logger.info(
+        "STT idle offload resolved: ttl=%s (cli=%s env_WHISPER_IDLE_OFFLOAD_SECONDS=%s env_MODEL_IDLE_TIMEOUT=%s)",
+        config.stt_idle_offload_seconds,
+        config.idle_offload_cli_seconds,
+        os.getenv("WHISPER_IDLE_OFFLOAD_SECONDS"),
+        os.getenv("MODEL_IDLE_TIMEOUT"),
+    )
 
     # Initialize OpenTelemetry if endpoint is configured
     if config.otel_exporter_otlp_endpoint:

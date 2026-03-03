@@ -59,10 +59,23 @@ class SelfDisposingModel[T]:
 
     def _schedule_unload_if_idle(self) -> None:
         if self.ttl <= 0:
-            logger.info(f"Model {self.model_id} is idle, not unloading (disabled). {self.ref_count=}, {self.ttl=}")
+            logger.info(
+                "Model idle state: model_id=%s ref_count=%s ttl=%s offload_disabled=%s",
+                self.model_id,
+                self.ref_count,
+                self.ttl,
+                True,
+            )
             return
 
-        logger.info(f"Model {self.model_id} is idle, scheduling offload in {self.ttl}s. {self.ref_count=}, {self.ttl=}")
+        logger.info(
+            "Model idle state: model_id=%s ref_count=%s ttl=%s offload_disabled=%s scheduling_offload_in=%ss",
+            self.model_id,
+            self.ref_count,
+            self.ttl,
+            False,
+            self.ttl,
+        )
         self.expire_timer = threading.Timer(self.ttl, self._unload_if_idle)
         self.expire_timer.start()
 
@@ -105,15 +118,30 @@ class SelfDisposingModel[T]:
 
     def _decrement_ref(self) -> None:
         with self.rlock:
-            if self.ref_count <= 0:
+            if self.ref_count == 0:
                 logger.warning(
-                    f"Attempted to decrement ref count below zero for {self.model_id}. Clamping to zero. {self.ref_count=}"
+                    "Attempted to decrement ref count below zero for %s. Ignoring decrement. ref_count=%s",
+                    self.model_id,
+                    self.ref_count,
+                )
+                return
+            if self.ref_count < 0:
+                logger.warning(
+                    "Ref count underflow detected for %s. Clamping to zero. ref_count=%s",
+                    self.model_id,
+                    self.ref_count,
                 )
                 self.ref_count = 0
                 return
 
             self.ref_count -= 1
-            logger.debug(f"Decremented ref count for {self.model_id}, {self.ref_count=}")
+            logger.info(
+                "Model ref decrement: model_id=%s ref_count=%s ttl=%s offload_disabled=%s",
+                self.model_id,
+                self.ref_count,
+                self.ttl,
+                self.ttl <= 0,
+            )
             if self.ref_count == 0:
                 self._schedule_unload_if_idle()
 
