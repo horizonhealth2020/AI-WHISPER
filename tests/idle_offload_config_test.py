@@ -25,8 +25,7 @@ def test_invalid_idle_offload_env_var_falls_back_with_warning(caplog: pytest.Log
 
 def test_zero_idle_offload_disables_scheduling() -> None:
     idle_offload_seconds = resolve_idle_offload_seconds(environ={"WHISPER_IDLE_OFFLOAD_SECONDS": "0"})
-    effective_ttl = idle_offload_seconds if idle_offload_seconds > 0 else -1
-    model = SelfDisposingModel[str](model_id="m", load_fn=lambda: "loaded", ttl=effective_ttl)
+    model = SelfDisposingModel[str](model_id="m", load_fn=lambda: "loaded", ttl=idle_offload_seconds)
 
     with model:
         pass

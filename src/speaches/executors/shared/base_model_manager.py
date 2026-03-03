@@ -52,14 +52,35 @@ class SelfDisposingModel[T]:
         self.expire_timer: threading.Timer | None = None
         self.model: T | None = None
 
+    def _cancel_expire_timer(self) -> None:
+        if self.expire_timer is not None:
+            self.expire_timer.cancel()
+            self.expire_timer = None
+
+    def _schedule_unload_if_idle(self) -> None:
+        if self.ttl <= 0:
+            logger.info(f"Model {self.model_id} is idle, not unloading (disabled). {self.ref_count=}, {self.ttl=}")
+            return
+
+        logger.info(f"Model {self.model_id} is idle, scheduling offload in {self.ttl}s. {self.ref_count=}, {self.ttl=}")
+        self.expire_timer = threading.Timer(self.ttl, self._unload_if_idle)
+        self.expire_timer.start()
+
+    def _unload_if_idle(self) -> None:
+        with self.rlock:
+            self.expire_timer = None
+            if self.ref_count > 0:
+                logger.info(f"Skipping unload for {self.model_id}; model is in use. {self.ref_count=}")
+                return
+        self.unload()
+
     def unload(self) -> None:
         with self.rlock:
             if self.model is None:
                 raise ValueError(f"Model {self.model_id} is not loaded. {self.ref_count=}")
             if self.ref_count > 0:
                 raise ValueError(f"Model {self.model_id} is still in use. {self.ref_count=}")
-            if self.expire_timer:
-                self.expire_timer.cancel()
+            self._cancel_expire_timer()
             self.model = None
             gc.collect()
             logger.info(f"Model {self.model_id} unloaded")
@@ -77,25 +98,24 @@ class SelfDisposingModel[T]:
     def _increment_ref(self) -> None:
         with self.rlock:
             self.ref_count += 1
-            if self.expire_timer:
+            if self.expire_timer is not None:
                 logger.debug(f"Model was set to expire in {self.expire_timer.interval}s, cancelling")
-                self.expire_timer.cancel()
+                self._cancel_expire_timer()
             logger.debug(f"Incremented ref count for {self.model_id}, {self.ref_count=}")
 
     def _decrement_ref(self) -> None:
         with self.rlock:
+            if self.ref_count <= 0:
+                logger.warning(
+                    f"Attempted to decrement ref count below zero for {self.model_id}. Clamping to zero. {self.ref_count=}"
+                )
+                self.ref_count = 0
+                return
+
             self.ref_count -= 1
             logger.debug(f"Decremented ref count for {self.model_id}, {self.ref_count=}")
-            if self.ref_count <= 0:
-                if self.ttl > 0:
-                    logger.debug(f"Model {self.model_id} is idle, scheduling offload in {self.ttl}s")
-                    self.expire_timer = threading.Timer(self.ttl, self.unload)
-                    self.expire_timer.start()
-                elif self.ttl == 0:
-                    logger.info(f"Model {self.model_id} is idle, unloading immediately")
-                    self.unload()
-                else:
-                    logger.info(f"Model {self.model_id} is idle, not unloading")
+            if self.ref_count == 0:
+                self._schedule_unload_if_idle()
 
     def __enter__(self) -> T:
         with self.rlock:

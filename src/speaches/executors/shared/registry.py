@@ -27,7 +27,7 @@ class ExecutorRegistry:
         self._whisper_executor = Executor(
             name="whisper",
             model_manager=WhisperModelManager(
-                config.stt_idle_offload_seconds if config.stt_idle_offload_seconds > 0 else -1, config.whisper
+                config.stt_idle_offload_seconds, config.whisper
             ),
             model_registry=whisper_model_registry,
             task="automatic-speech-recognition",
@@ -35,7 +35,7 @@ class ExecutorRegistry:
         self._parakeet_executor = Executor(
             name="parakeet",
             model_manager=ParakeetModelManager(
-                config.stt_idle_offload_seconds if config.stt_idle_offload_seconds > 0 else -1, config.unstable_ort_opts
+                config.stt_idle_offload_seconds, config.unstable_ort_opts
             ),
             model_registry=parakeet_model_registry,
             task="automatic-speech-recognition",
