@@ -29,7 +29,13 @@ def resolve_idle_offload_seconds(
     cli_value: int | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> int:
-    """Resolve STT idle offload timeout from CLI/env/default values."""
+    """Resolve STT idle offload timeout from CLI/env/default values.
+
+    Semantics are aligned with ``SelfDisposingModel``:
+    - ttl < 0: never unload
+    - ttl == 0: unload immediately
+    - ttl > 0: unload after ttl seconds
+    """
 
     selected_value: str | int | None = cli_value
     selected_source = "CLI flag --idle-offload-seconds"
@@ -49,14 +55,12 @@ def resolve_idle_offload_seconds(
 
     try:
         parsed = int(selected_value)
-        if parsed < 0:
-            raise ValueError("must be >= 0")
-        if parsed == 0:
-            return -1
+        if parsed < -1:
+            raise ValueError("must be >= -1")
         return parsed
     except (TypeError, ValueError):
         logger.warning(
-            "Invalid idle offload seconds from %s: %r. Falling back to default %ss.",
+            "Invalid idle offload seconds from %s: %r (must be >= -1). Falling back to default %ss.",
             selected_source,
             selected_value,
             IDLE_OFFLOAD_DEFAULT_SECONDS,
