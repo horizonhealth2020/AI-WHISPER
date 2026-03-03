@@ -191,36 +191,38 @@ class WhisperModelManager(BaseModelManager[WhisperModel]):
     ) -> Generator[StreamingTranscriptionEvent]:
         timelog_start = time.perf_counter()
         with self.load_model(request.model) as whisper:
-            whisper_model = BatchedInferencePipeline(model=whisper)
+            try:
+                whisper_model = BatchedInferencePipeline(model=whisper)
 
-            clip_timestamps = merge_segments(
-                request.speech_segments,
-                request.vad_options,
-            )
-            segments, _transcription_info = whisper_model.transcribe(
-                request.audio.data,
-                task="transcribe",
-                language=request.language,
-                initial_prompt=request.prompt,
-                word_timestamps="word" in request.timestamp_granularities,
-                temperature=request.temperature,
-                vad_filter=False,
-                clip_timestamps=clip_timestamps,  # pyright: ignore[reportArgumentType]
-                hotwords=request.hotwords,
-                without_timestamps=request.without_timestamps,
-            )
-
-            for segment in segments:
-                yield openai.types.audio.TranscriptionTextDeltaEvent(
-                    type="transcript.text.delta", delta=segment.text, logprobs=None
+                clip_timestamps = merge_segments(
+                    request.speech_segments,
+                    request.vad_options,
+                )
+                segments, _transcription_info = whisper_model.transcribe(
+                    request.audio.data,
+                    task="transcribe",
+                    language=request.language,
+                    initial_prompt=request.prompt,
+                    word_timestamps="word" in request.timestamp_granularities,
+                    temperature=request.temperature,
+                    vad_filter=False,
+                    clip_timestamps=clip_timestamps,  # pyright: ignore[reportArgumentType]
+                    hotwords=request.hotwords,
+                    without_timestamps=request.without_timestamps,
                 )
 
-            yield openai.types.audio.TranscriptionTextDoneEvent(
-                type="transcript.text.done", text="".join(segment.text for segment in segments), logprobs=None
-            )
-        logger.info(
-            f"Transcribed {request.audio.duration} seconds of audio in {time.perf_counter() - timelog_start} seconds"
-        )
+                for segment in segments:
+                    yield openai.types.audio.TranscriptionTextDeltaEvent(
+                        type="transcript.text.delta", delta=segment.text, logprobs=None
+                    )
+
+                yield openai.types.audio.TranscriptionTextDoneEvent(
+                    type="transcript.text.done", text="".join(segment.text for segment in segments), logprobs=None
+                )
+            finally:
+                logger.info(
+                    f"Transcribed {request.audio.duration} seconds of audio in {time.perf_counter() - timelog_start} seconds"
+                )
 
     def handle_transcription_request(
         self, request: TranscriptionRequest, **kwargs
